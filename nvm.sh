@@ -18,15 +18,18 @@ nvm()
       echo "Node Version Manager"
       echo
       echo "Usage:"
-      echo "    nvm help            (Show this message)"
-      echo "    nvm install version (Download and install a released version)"
-      echo "    nvm list            (Show all installed versions)"
-      echo "    nvm use version     (Set this version in the PATH)"
-      echo "    nvm use             (Use the latest stable version)"
-      echo "    nvm deactivate      (Remove nvm entry from PATH)"
-      echo "    nvm addlib          (Copies the module in cwd to the current env)"
-      echo "    nvm linklib         (Links the module in cwd to the current env)"
-      echo "    nvm listlibs        (Show the modules in the current env)"
+      echo "    nvm help              (Show this message)"
+      echo "    nvm install version   (Download and install a released version)"
+      echo "    nvm clone             (Install the HEAD version)"
+      echo "    nvm update            (Update the HEAD with the latest from the repo)"
+      echo "    nvm list              (Show all installed versions)"
+      echo "    nvm use version       (Set this version in the PATH)"
+      echo "    nvm use               (Use the latest stable version or HEAD if none)"
+      echo "    nvm deactivate        (Remove nvm entry from PATH)"
+      echo "    nvm addlib            (Copies the module in cwd to the current env)"
+      echo "    nvm linklib           (Links the module in cwd to the current env)"
+      echo "    nvm listlibs          (Show the modules in the current env)"
+      echo "    nvm uninstall version (Remove a version (incl. HEAD)"
       echo
       echo "Example:"
       echo "    nvm install v0.1.94"
@@ -46,6 +49,46 @@ nvm()
       make && \
       make install && \
       nvm use $2
+      cd $START
+    ;;
+    "clone" )
+      mkdir -p "$NVM_DIR/src" && \
+      cd "$NVM_DIR/src" && \
+      git clone "git://github.com/ry/node.git" "HEAD" && \
+      cd "HEAD" && \
+      ./configure --prefix="$NVM_DIR/HEAD" && \
+      make && \
+      make install && \
+      nvm use HEAD
+      cd $START
+    ;;
+    "update" )
+      if [ -d "$NVM_DIR/src/HEAD" ]; then
+        cd "$NVM_DIR/src/HEAD" && \
+        git pull && \
+        ./configure --prefix="$NVM_DIR/HEAD" && \
+        make && \
+        make install && \
+        nvm use HEAD
+      else
+        echo "HEAD version is not installed yet"
+      fi
+      cd $START
+    ;;
+    "uninstall" )
+      if [ $# -ne 2 ]; then
+        nvm help
+        return;
+      fi
+      if [ "$2" == "HEAD" ]; then
+        rm -rf "$NVM_DIR/src/$2" > /dev/null
+        rm -rf "$NVM_DIR/HEAD" > /dev/null
+      else
+        rm -rf "$NVM_DIR/src/node-$2" > /dev/null
+        rm -f  "$NVM_DIR/src/node-$2.tar.gz" > /dev/null
+        rm -rf "$NVM_DIR/$2" > /dev/null
+      fi
+      nvm use
       cd $START
     ;;
     "deactivate" )
@@ -82,7 +125,7 @@ nvm()
     ;;
     "use" )
       if [ $# -ne 2 ]; then
-        for f in $NVM_DIR/v*; do
+        for f in $NVM_DIR/HEAD $NVM_DIR/v*; do
           nvm use ${f##*/} > /dev/null
         done
         return;
@@ -116,6 +159,12 @@ nvm()
           echo "HEAD"
         fi
       fi
+      if [ ! `shopt -q nullglob` ]; then
+        NG=1
+        shopt -s nullglob
+      else
+        NG=0
+      fi
       for f in $NVM_DIR/v*; do
         if [[ $PATH == *$f/bin* ]]; then
           echo "v${f##*v} *"
@@ -123,6 +172,9 @@ nvm()
           echo "v${f##*v}"
         fi
       done
+      if [ $NG -eq 1 ]; then
+        shopt -u nullglob
+      fi
     ;;
     * )
       nvm help
