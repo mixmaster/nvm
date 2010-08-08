@@ -4,6 +4,8 @@
 #
 # Implemented by Tim Caswell <tim@creationix.com>
 # with much bash help from Matthew Ranney
+#
+# Improved by Donald Luo <donaldluo@gmail.com>
 
 nvm()
 {
@@ -23,6 +25,7 @@ nvm()
       echo "    nvm clone             (Install the HEAD version)"
       echo "    nvm update            (Update the HEAD with the latest from the repo)"
       echo "    nvm list              (Show all installed versions)"
+      echo "    nvm list -a           (Show all available versions)"
       echo "    nvm use version       (Set this version in the PATH)"
       echo "    nvm use               (Use the latest stable version or HEAD if none)"
       echo "    nvm deactivate        (Remove nvm entry from PATH)"
@@ -36,7 +39,7 @@ nvm()
       echo
     ;;
     "install" )
-      if [ $# -ne 2 ]; then
+      if [[ $# -ne 2 ]]; then
         nvm help
         return;
       fi
@@ -48,8 +51,8 @@ nvm()
       ./configure --prefix="$NVM_DIR/$2" && \
       make && \
       make install && \
-      nvm use $2
       cd $START
+      nvm use $2
     ;;
     "clone" )
       mkdir -p "$NVM_DIR/src" && \
@@ -63,7 +66,7 @@ nvm()
       cd $START
     ;;
     "update" )
-      if [ -d "$NVM_DIR/src/HEAD" ]; then
+      if [[ -d "$NVM_DIR/src/HEAD" ]]; then
         cd "$NVM_DIR/src/HEAD" && \
         git pull && \
         ./configure --prefix="$NVM_DIR/HEAD" && \
@@ -76,11 +79,11 @@ nvm()
       cd $START
     ;;
     "uninstall" )
-      if [ $# -ne 2 ]; then
+      if [[ $# -ne 2 ]]; then
         nvm help
         return;
       fi
-      if [ "$2" == "HEAD" ]; then
+      if [[ "$2" == "HEAD" ]]; then
         rm -rf "$NVM_DIR/src/$2" > /dev/null
         rm -rf "$NVM_DIR/HEAD" > /dev/null
       else
@@ -88,8 +91,8 @@ nvm()
         rm -f  "$NVM_DIR/src/node-$2.tar.gz" > /dev/null
         rm -rf "$NVM_DIR/$2" > /dev/null
       fi
-      nvm use
       cd $START
+      nvm use
     ;;
     "deactivate" )
       if [[ $PATH == *$NVM_DIR/*/bin* ]]; then
@@ -124,7 +127,7 @@ nvm()
       fi
     ;;
     "use" )
-      if [ $# -ne 2 ]; then
+      if [[ $# -ne 2 ]]; then
         for f in $NVM_DIR/HEAD $NVM_DIR/v*; do
           nvm use ${f##*/} > /dev/null
         done
@@ -148,32 +151,45 @@ nvm()
       ls $NVM_PATH | grep -v wafadmin
     ;;
     "list" )
-      if [ $# -ne 1 ]; then
+      if [[ $# -ne 1 && $# -ne 2 ]]; then
         nvm help
         return;
       fi
-      if [ -d $NVM_DIR/HEAD ]; then
+      if [[ -d $NVM_DIR/HEAD ]]; then
         if [[ $PATH == *$NVM_DIR/HEAD/bin* ]]; then
           echo "HEAD *"
         else
           echo "HEAD"
         fi
       fi
-      if [ ! `shopt -q nullglob` ]; then
-        NG=1
-        shopt -s nullglob
+      INSTALLED=$(ls $NVM_DIR | grep -E 'v[0-9]+\.[0-9]+\.[0-9]+')
+      if [[ "$2" != "-a" ]]; then
+		for i in $INSTALLED; do
+		  if [[ $PATH == *$i/bin* ]]; then
+		    echo "v${i##*v} I *"
+		  else
+		    echo "v${i##*v} I"
+		  fi
+		 done
       else
-        NG=0
-      fi
-      for f in $NVM_DIR/v*; do
-        if [[ $PATH == *$f/bin* ]]; then
-          echo "v${f##*v} *"
-        else
-          echo "v${f##*v}"
-        fi
-      done
-      if [ $NG -eq 1 ]; then
-        shopt -u nullglob
+        ALL_VERSIONS=$(curl -sS 'http://nodejs.org/dist/' | sed -n -r 's/^<a href="(node-(v[0-9]+\.[0-9]+\.[0-9]+).tar.gz)">\1<\/a>.*$/\2/p')
+        for v in $ALL_VERSIONS; do
+          FOUND=0
+          for i in $INSTALLED; do
+            if [[ ${v##*v} == ${i##*v} ]]; then
+              FOUND=1
+              if [[ $PATH == *$v/bin* ]]; then
+                echo "v${v##*v} I *"
+              else
+                echo "v${v##*v} I"
+              fi
+              break
+            fi
+          done
+          if [[ $FOUND -eq 0 ]]; then
+            echo "v${v##*v}"
+          fi
+        done
       fi
     ;;
     * )
